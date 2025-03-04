@@ -7,6 +7,34 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const app = express();
 
+const fs = require('fs');
+
+// Read DATABASE_URL from the secret file
+const databaseUrlPath = '/etc/secrets/database_url'; // Replace with the actual path
+
+let databaseUrl = '';
+if (fs.existsSync(databaseUrlPath)) {
+  databaseUrl = fs.readFileSync(databaseUrlPath, 'utf8').trim();
+} else {
+  console.error('DATABASE_URL file not found!');
+}
+
+// Create PostgreSQL connection pool
+const pool = new Pool({
+  connectionString: databaseUrl
+});
+
+
+
+
+
+
+
+
+
+
+
+
 // Enable CORS to allow requests from your React app
 app.use(cors());
 console.log('All ENV:', process.env);
@@ -15,10 +43,10 @@ console.log('All ENV:', process.env);
 app.use(bodyParser.json());
 
 // Create a PostgreSQL connection pool
-const pool = new Pool({
+/*const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
-
+*/
 // Login endpoint
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
