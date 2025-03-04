@@ -9,6 +9,7 @@ const app = express();
 
 // Enable CORS to allow requests from your React app
 app.use(cors());
+console.log('All ENV:', process.env);
 
 // Parse JSON bodies
 app.use(bodyParser.json());
