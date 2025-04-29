@@ -5,20 +5,53 @@ const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+require('dotenv').config();
+
 const app = express();
 
-const fs = require('fs');
 // Enable CORS to allow requests from your React app
 app.use(cors());
-console.log('All ENV:', process.env);
 
 // Parse JSON bodies
 app.use(bodyParser.json());
 
-// Create a PostgreSQL connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
-});
+// Create a PostgreSQL connection pool with retry logic
+const createPool = () => {
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false
+    },
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+  });
+
+  pool.on('error', (err) => {
+    console.error('Unexpected error on idle client', err);
+    process.exit(-1);
+  });
+
+  return pool;
+};
+
+let pool = createPool();
+
+// Test database connection
+const testConnection = async () => {
+  try {
+    const client = await pool.connect();
+    console.log('Database connection successful');
+    client.release();
+  } catch (err) {
+    console.error('Database connection failed:', err);
+    // Attempt to recreate the pool
+    pool = createPool();
+  }
+};
+
+// Test connection on startup
+testConnection();
 
 // Login endpoint
 app.post('/login', async (req, res) => {
@@ -35,7 +68,7 @@ app.post('/login', async (req, res) => {
     if (!match) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-    // Generate a JWT token (set JWT_SECRET in .env)
+    // Generate a JWT token
     const token = jwt.sign(
       { id: user.id, username: user.username },
       process.env.JWT_SECRET,
@@ -50,12 +83,10 @@ app.post('/login', async (req, res) => {
 
 // Start the server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
-require('dotenv').config();
-console.log('DATABASE_URL:', process.env.DATABASE_URL);
-console.log('PORT:', process.env.PORT);
-// server.js
-// ... Your existing /login route here ...
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log('DATABASE_URL:', process.env.DATABASE_URL);
+});
 
 /**
  * POST /forgot-password/check
