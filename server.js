@@ -56,21 +56,45 @@ testConnection();
 // Login endpoint
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
+  
+  // Debug logging
+  console.log('Login attempt for user:', username);
+  console.log('Request body:', req.body);
+  
+  if (!password) {
+    console.error('No password provided in request');
+    return res.status(400).json({ message: 'Password is required' });
+  }
+  
   try {
     // Find user by username
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    const result = await pool.query('SELECT * FROM users WHERE name = $1', [username]);
     if (result.rows.length === 0) {
+      console.error('User not found:', username);
       return res.status(400).json({ message: 'Invalid credentials' });
     }
+    
     const user = result.rows[0];
+    console.log('Found user:', { id: user.id, username: user.name });
+    
+    if (!user.password_hash) {
+      console.error('No password hash found for user:', username);
+      return res.status(500).json({ message: 'User account error - no password hash' });
+    }
+    
+    // Debug log lengths to help diagnose issues
+    console.log('Password length:', password.length);
+    console.log('Hash length:', user.password_hash.length);
+    
     // Compare password with stored hashed password
-    const match = await bcrypt.compare(password, user.password);
+    console.log('Attempting bcrypt compare...');
+    const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
     // Generate a JWT token
     const token = jwt.sign(
-      { id: user.id, username: user.username },
+      { id: user.id, username: user.name },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
@@ -97,7 +121,7 @@ app.post('/forgot-password/check', async (req, res) => {
 
   try {
     // Check if user exists
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    const result = await pool.query('SELECT * FROM users WHERE name = $1', [username]);
     if (result.rows.length === 0) {
       return res.json({ success: false, message: "Username doesn't exist" });
     }
@@ -124,7 +148,7 @@ app.post('/forgot-password/reset', async (req, res) => {
 
   try {
     // Check if user exists
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    const result = await pool.query('SELECT * FROM users WHERE name = $1', [username]);
     if (result.rows.length === 0) {
       return res.json({ success: false, message: "Username doesn't exist" });
     }
@@ -138,7 +162,7 @@ app.post('/forgot-password/reset', async (req, res) => {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update the password in the database
-    await pool.query('UPDATE users SET password = $1 WHERE username = $2', [hashedPassword, username]);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE name = $2', [hashedPassword, username]);
 
     return res.json({ success: true, message: 'Password updated successfully!' });
   } catch (error) {
