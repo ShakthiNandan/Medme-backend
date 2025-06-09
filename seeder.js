@@ -14,7 +14,7 @@ async function seedUser() {
   const hashedPassword = await bcrypt.hash(plaintextPassword, 10);
 
   // Insert into DB
-  const query = 'INSERT INTO users (username, password) VALUES ($1, $2)';
+  const query = 'INSERT INTO users (name, password_hash) VALUES ($1, $2)';
   const values = [username, hashedPassword];
 
   try {
